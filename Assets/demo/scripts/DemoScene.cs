@@ -69,8 +69,8 @@ public class DemoScene : MonoBehaviour
 	// the Update loop contains a very simple example of moving the character around and controlling the animation
 	void Update()
 	{
-		if( _controller.isGrounded )
-			_velocity.y = 0;
+		//if( _controller.isGrounded )
+		//	_velocity.y = 0;
 
 		if( Input.GetKey( KeyCode.RightArrow ) )
 		{
@@ -103,18 +103,23 @@ public class DemoScene : MonoBehaviour
 		if( Input.GetKey( KeyCode.UpArrow ))
 		{
 
-            if (jumpReleased)
-                jumpReleased = false;
-
             if (!isJumping)
                 _animator.Play( Animator.StringToHash( "Jump" ) );
 
-            jumpForceCalc -= Time.deltaTime;
-            if(jumpForceCalc > 0 && !jumpReleased) {
-                _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
+            if(!jumpReleased)
                 isJumping = true;
+
+
+            if(jumpForceCalc <= 0.0f)
+            {
+                isJumping = false;
+                jumpReleased = true;
             }
-                
+            if (!jumpReleased && isJumping)
+            {
+                jumpForceCalc -= Time.deltaTime;
+                _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
+            }
             
             
 		}
@@ -126,8 +131,6 @@ public class DemoScene : MonoBehaviour
         {
             isJumping = false;
             jumpReleased = true;
-            if (_controller.isGrounded)
-                jumpReleased = false;
         }
         
 
@@ -153,6 +156,7 @@ public class DemoScene : MonoBehaviour
             }
 
             jumpForceCalc = jumpForce;
+            jumpReleased = false;
 
         }
 
