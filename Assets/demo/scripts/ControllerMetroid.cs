@@ -1,9 +1,9 @@
-﻿using UnityEngine;
-using System.Collections;
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 using Prime31;
 
-
-public class DemoScene : MonoBehaviour
+public class ControllerMetroid : MonoBehaviour
 {
     // movement config
     public float gravity = -25f;
@@ -11,14 +11,20 @@ public class DemoScene : MonoBehaviour
     public float groundDamping = 20f; // how fast do we change direction? higher means faster
     public float inAirDamping = 5f;
     public float jumpHeight = 3f;
+    public float jumpForce = 0.2f;
 
-    [HideInInspector]
+
     private float normalizedHorizontalSpeed = 0;
 
     private CharacterController2D _controller;
     private Animator _animator;
     private RaycastHit2D _lastControllerColliderHit;
     private Vector3 _velocity;
+
+    bool isFalling;
+    bool jumpReleased;
+    bool isJumping;
+    float jumpForceCalc;
 
 
     void Awake()
@@ -63,8 +69,8 @@ public class DemoScene : MonoBehaviour
     // the Update loop contains a very simple example of moving the character around and controlling the animation
     void Update()
     {
-        if (_controller.isGrounded)
-            _velocity.y = 0;
+        //if( _controller.isGrounded )
+        //  _velocity.y = 0;
 
         if (Input.GetKey(KeyCode.RightArrow))
         {
@@ -93,12 +99,40 @@ public class DemoScene : MonoBehaviour
         }
 
 
-        // we can only jump whilst grounded
-        if (_controller.isGrounded && Input.GetKeyDown(KeyCode.UpArrow))
+
+        if (Input.GetKey(KeyCode.UpArrow))
         {
-            _velocity.y = Mathf.Sqrt(2f * jumpHeight * -gravity);
-            _animator.Play(Animator.StringToHash("Jump"));
+
+            if (!isJumping)
+                _animator.Play(Animator.StringToHash("Jump"));
+
+            if (!jumpReleased)
+                isJumping = true;
+
+
+            if (jumpForceCalc <= 0.0f)
+            {
+                isJumping = false;
+                jumpReleased = true;
+            }
+            if (!jumpReleased && isJumping)
+            {
+                jumpForceCalc -= Time.deltaTime;
+                _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
+            }
+
+
         }
+
+
+
+        //Release character to jump again
+        if (!Input.GetKey(KeyCode.UpArrow) && isJumping)
+        {
+            isJumping = false;
+            jumpReleased = true;
+        }
+
 
 
         // apply horizontal speed smoothing it. dont really do this with Lerp. Use SmoothDamp or something that provides more control
@@ -106,20 +140,42 @@ public class DemoScene : MonoBehaviour
         _velocity.x = Mathf.Lerp(_velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor);
 
         // apply gravity before moving
-        _velocity.y += gravity * Time.deltaTime;
+        if (!_controller.isGrounded && !isJumping)
+        {
+            _velocity.y += gravity * Time.deltaTime;
+        }
 
         // if holding down bump up our movement amount and turn off one way platform detection for a frame.
         // this lets us jump down through one way platforms
-        if (_controller.isGrounded && Input.GetKey(KeyCode.DownArrow))
+        if (_controller.isGrounded)
         {
-            _velocity.y *= 3f;
-            _controller.ignoreOneWayPlatformsThisFrame = true;
+            if (Input.GetKey(KeyCode.DownArrow))
+            {
+                _velocity.y *= 3f;
+                _controller.ignoreOneWayPlatformsThisFrame = true;
+            }
+
+            jumpForceCalc = jumpForce;
+            jumpReleased = false;
+
         }
 
         _controller.move(_velocity * Time.deltaTime);
 
         // grab our current _velocity to use as a base for all calculations
         _velocity = _controller.velocity;
+
+        isFalling = _velocity.y < 0;
+
+        _animator.SetFloat("velocityY", _velocity.y);
+
+        _animator.SetBool("grounded", _controller.isGrounded);
+
+        _animator.SetBool("falling", isFalling);
+
+
     }
 
 }
+
+
