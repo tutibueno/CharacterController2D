@@ -25,7 +25,9 @@ public class ControllerMetroid : MonoBehaviour
     bool jumpReleased;
     bool isJumping;
     float jumpForceCalc;
-
+    bool wasJumping; //indicates the jump started some point and not finished yet, can prevent jump key forever pressed (infinite jumps after landing)
+    bool landed; //want add some extra feature when landing?
+    Vector3 velocityLastFrame;
 
     void Awake()
     {
@@ -69,8 +71,9 @@ public class ControllerMetroid : MonoBehaviour
     // the Update loop contains a very simple example of moving the character around and controlling the animation
     void Update()
     {
-        //if( _controller.isGrounded )
-        //  _velocity.y = 0;
+
+        if( _controller.isGrounded )
+          _velocity.y = 0;
 
         if (Input.GetKey(KeyCode.RightArrow))
         {
@@ -100,28 +103,24 @@ public class ControllerMetroid : MonoBehaviour
 
 
 
-        if (Input.GetKey(KeyCode.UpArrow))
+        if (Input.GetKeyDown(KeyCode.UpArrow))
         {
 
-            if (!isJumping)
-                _animator.Play(Animator.StringToHash("Jump"));
-
-            if (!jumpReleased)
+            if(CheckGrounded())
                 isJumping = true;
+        }
 
-
+        if(Input.GetKey(KeyCode.UpArrow) && isJumping)
+        {
             if (jumpForceCalc <= 0.0f)
             {
                 isJumping = false;
-                jumpReleased = true;
             }
-            if (!jumpReleased && isJumping)
+            if (isJumping)
             {
                 jumpForceCalc -= Time.deltaTime;
                 _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
             }
-
-
         }
 
 
@@ -131,6 +130,7 @@ public class ControllerMetroid : MonoBehaviour
         {
             isJumping = false;
             jumpReleased = true;
+
         }
 
 
@@ -140,10 +140,9 @@ public class ControllerMetroid : MonoBehaviour
         _velocity.x = Mathf.Lerp(_velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor);
 
         // apply gravity before moving
-        if (!_controller.isGrounded && !isJumping)
-        {
+        if(!_controller.isGrounded)
             _velocity.y += gravity * Time.deltaTime;
-        }
+        
 
         // if holding down bump up our movement amount and turn off one way platform detection for a frame.
         // this lets us jump down through one way platforms
@@ -155,8 +154,10 @@ public class ControllerMetroid : MonoBehaviour
                 _controller.ignoreOneWayPlatformsThisFrame = true;
             }
 
+
             jumpForceCalc = jumpForce;
             jumpReleased = false;
+            
 
         }
 
@@ -165,15 +166,32 @@ public class ControllerMetroid : MonoBehaviour
         // grab our current _velocity to use as a base for all calculations
         _velocity = _controller.velocity;
 
-        isFalling = _velocity.y < 0;
+        isFalling = _velocity.y < 0 && !CheckGrounded();
+
+        if (!isFalling && velocityLastFrame.y < -1 && !landed)
+        {
+            landed = true;
+            Debug.Log("OnLandaded");
+        }
+        else
+            landed = false;
 
         _animator.SetFloat("velocityY", _velocity.y);
 
-        _animator.SetBool("grounded", _controller.isGrounded);
+        _animator.SetBool("grounded", CheckGrounded());
 
         _animator.SetBool("falling", isFalling);
 
+        _animator.SetBool("jumping", isJumping);
 
+        velocityLastFrame = _controller.velocity;
+
+
+    }
+
+    bool CheckGrounded()
+    {
+        return _controller.collisionState.becameGroundedThisFrame || _controller.collisionState.wasGroundedLastFrame;
     }
 
 }

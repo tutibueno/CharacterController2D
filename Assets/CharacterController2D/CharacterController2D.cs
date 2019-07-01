@@ -17,7 +17,7 @@ public class CharacterController2D : MonoBehaviour
 		public Vector3 bottomRight;
 		public Vector3 bottomLeft;
 	}
-
+    
 	public class CharacterCollisionState2D
 	{
 		public bool right;
@@ -141,8 +141,9 @@ public class CharacterController2D : MonoBehaviour
 	[HideInInspector][NonSerialized]
 	public Rigidbody2D rigidBody2D;
 
-	[HideInInspector][NonSerialized]
-	public CharacterCollisionState2D collisionState = new CharacterCollisionState2D();
+        [HideInInspector]
+        [NonSerialized]
+        public CharacterCollisionState2D collisionState = new CharacterCollisionState2D();
 	[HideInInspector][NonSerialized]
 	public Vector3 velocity;
 	public bool isGrounded { get { return collisionState.below; } }
