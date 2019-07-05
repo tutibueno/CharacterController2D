@@ -57,17 +57,37 @@ public class NPC : MonoBehaviour
         velocity.x = speed * direction;
 
         currentSpeed = speed * direction;
-
         
         controller.move(velocity * Time.deltaTime);
 
         animator.SetFloat("speed", Mathf.Abs(currentSpeed));
 
-        
-
         distanceFromPlayer = Vector2.Distance(transform.position, player.position);
 
-        
+
+    }
+
+    bool WillFall()
+    {
+        if (!controller.isGrounded)
+            return false;
+
+        var isGoingRight = velocity.x > 0;
+        var rayDistance = controller.skinWidth * 2;
+        var rayDirection = Vector3.down * 1.3f;
+        var initialRayOrigin = isGoingRight ? controller.raycastOrigins.bottomRight : controller.raycastOrigins.bottomLeft;
+
+        var ray = new Vector2(initialRayOrigin.x, initialRayOrigin.y);
+
+        Debug.DrawRay(initialRayOrigin, rayDirection * rayDistance, Color.blue);
+
+        var raycastHit = Physics2D.Raycast(ray, rayDirection, rayDistance, controller.platformMask);
+
+        if (raycastHit)
+            return false;
+
+        return true;
+
 
     }
 
@@ -89,7 +109,7 @@ public class NPC : MonoBehaviour
 
         animator.SetBool("isAttacking", false);
 
-        if (direction == 0)
+        if (direction == 0 && controller.isGrounded)
         {
             direction = player.position.x >= transform.position.x ? 1 : -1;
         }
@@ -100,6 +120,12 @@ public class NPC : MonoBehaviour
         else
             if (controller.collisionState.left)
             direction = 1;
+
+        if (!controller.isGrounded)
+            direction = 0;
+
+        if (WillFall())
+            direction *= -1;
 
         if (distanceFromPlayer <= 1)
             currentState = Attack;
