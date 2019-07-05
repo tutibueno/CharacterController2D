@@ -11,7 +11,7 @@ public class CharacterController2D : MonoBehaviour
 {
 	#region internal types
 
-	struct CharacterRaycastOrigins
+	public struct CharacterRaycastOrigins
 	{
 		public Vector3 topLeft;
 		public Vector3 bottomRight;
@@ -153,10 +153,12 @@ public class CharacterController2D : MonoBehaviour
 	#endregion
 
 
-	/// <summary>
-	/// holder for our raycast origin corners (TR, TL, BR, BL)
-	/// </summary>
-	CharacterRaycastOrigins _raycastOrigins;
+    /// <summary>
+    /// holder for our raycast origin corners (TR, TL, BR, BL)
+    /// </summary>
+    CharacterRaycastOrigins _raycastOrigins;
+    
+    public CharacterRaycastOrigins raycastOrigins { get { return _raycastOrigins; } }
 
 	/// <summary>
 	/// stores our raycast hit during movement
@@ -361,7 +363,7 @@ public class CharacterController2D : MonoBehaviour
 		{
 			var ray = new Vector2( initialRayOrigin.x, initialRayOrigin.y + i * _verticalDistanceBetweenRays );
 
-			DrawRay( ray, rayDirection * rayDistance, Color.red );
+			DrawRay( ray, rayDirection * rayDistance, Color.yellow );
 
 			// if we are grounded we will include oneWayPlatforms only on the first ray (the bottom one). this will allow us to
 			// walk up sloped oneWayPlatforms
