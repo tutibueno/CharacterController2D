@@ -15,35 +15,38 @@ public class NPC : MonoBehaviour
     float speed = 2;
 
     [SerializeField]
-    int direction = 1;
+    protected int direction = 1;
 
-    Transform player;
+    [SerializeField]
+    protected float distanceToAttack = 1;
 
-    Animator animator;
-    CharacterController2D controller;
+    protected GameObject player;
+
+    protected Animator animator;
+    protected CharacterController2D controller;
     Vector3 velocity;
 
-    delegate void State();
+    protected delegate void AiState();
 
-    State currentState;
+    protected AiState currentState;
 
-    float distanceFromPlayer;
-    float currentSpeed;
+    protected float distanceFromPlayer;
+    protected float currentSpeed;
 
     // Start is called before the first frame update
-    void Awake()
+    public virtual void Start()
     {
         animator = GetComponent<Animator>();
         controller = GetComponent<CharacterController2D>();
 
-        player = GameObject.FindGameObjectWithTag("Player").transform;
+        player = GameObject.FindGameObjectWithTag("Player");
 
         currentState = Patrol;
         
     }
 
     // Update is called once per frame
-    void Update()
+    public virtual void Update()
     {
 
 
@@ -62,12 +65,13 @@ public class NPC : MonoBehaviour
 
         animator.SetFloat("speed", Mathf.Abs(currentSpeed));
 
-        distanceFromPlayer = Vector2.Distance(transform.position, player.position);
+        distanceFromPlayer = player? Vector2.Distance(transform.position, player.transform.position) : 1000;
+
 
 
     }
 
-    bool WillFall()
+    protected bool WillFall()
     {
         if (!controller.isGrounded)
             return false;
@@ -91,27 +95,28 @@ public class NPC : MonoBehaviour
 
     }
 
-    void Attack()
+    public virtual void Attack()
     {
 
         direction = 0;
 
-        transform.rotation = Quaternion.Euler(0, player.position.x >= transform.position.x ? 0 : 180, 0);
+        if(player)
+            transform.rotation = Quaternion.Euler(0, player.transform.position.x >= transform.position.x ? 0 : 180, 0);
 
-        if (distanceFromPlayer > 1)
+        if (distanceFromPlayer > distanceToAttack)
             currentState = Patrol;
 
         animator.SetBool("isAttacking", true);
     }
 
-    void Patrol()
+    public virtual void Patrol()
     {
 
         animator.SetBool("isAttacking", false);
 
         if (direction == 0 && controller.isGrounded)
         {
-            direction = player.position.x >= transform.position.x ? 1 : -1;
+            direction = player.transform.position.x >= transform.position.x ? 1 : -1;
         }
             
 
@@ -127,10 +132,12 @@ public class NPC : MonoBehaviour
         if (WillFall())
             direction *= -1;
 
-        if (distanceFromPlayer <= 1)
+        if (distanceFromPlayer <= distanceToAttack)
             currentState = Attack;
 
         //Adjust rotation
         transform.rotation = Quaternion.Euler(0, direction > 0 ? 0 : 180, 0);
+
+
     }
 }

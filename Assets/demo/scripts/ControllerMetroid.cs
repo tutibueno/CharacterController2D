@@ -12,6 +12,7 @@ public class ControllerMetroid : MonoBehaviour
     public float inAirDamping = 5f;
     public float jumpHeight = 3f;
     public float jumpForce = 0.2f;
+    public float movingPlatformDump = 0.2f;
 
 
     private float normalizedHorizontalSpeed = 0;
@@ -20,7 +21,9 @@ public class ControllerMetroid : MonoBehaviour
     private Animator _animator;
     private RaycastHit2D _lastControllerColliderHit;
     private Vector3 _velocity;
+    Vector3 movingPlatformVelocity;
 
+    bool isAttacking;
     bool isFalling;
     bool jumpReleased;
     bool isJumping;
@@ -46,7 +49,7 @@ public class ControllerMetroid : MonoBehaviour
     void onControllerCollider(RaycastHit2D hit)
     {
         // bail out on plain old ground hits cause they arent very interesting
-        if (hit.normal.y == 1f)
+        if (Mathf.Approximately(hit.normal.y, 1f))
             return;
 
         // logs any collider hits if uncommented. it gets noisy so it is commented out for the demo
@@ -72,45 +75,39 @@ public class ControllerMetroid : MonoBehaviour
     void Update()
     {
 
-        if( _controller.isGrounded )
-          _velocity.y = 0;
+
+        if (_controller.isGrounded)
+            _velocity.y = 0;
+
+        normalizedHorizontalSpeed = 0;
+        bool grounded = CheckGrounded();
 
         if (Input.GetKey(KeyCode.RightArrow))
         {
-            normalizedHorizontalSpeed = 1;
-            if (transform.localScale.x < 0f)
-                transform.localScale = new Vector3(-transform.localScale.x, transform.localScale.y, transform.localScale.z);
-
-            if (_controller.isGrounded)
-                _animator.Play(Animator.StringToHash("Run"));
+            if ((grounded && !isAttacking) || !grounded)
+            {
+                normalizedHorizontalSpeed = 1;
+                transform.rotation = Quaternion.Euler(0, 0, 0);
+            }
         }
         else if (Input.GetKey(KeyCode.LeftArrow))
         {
-            normalizedHorizontalSpeed = -1;
-            if (transform.localScale.x > 0f)
-                transform.localScale = new Vector3(-transform.localScale.x, transform.localScale.y, transform.localScale.z);
-
-            if (_controller.isGrounded)
-                _animator.Play(Animator.StringToHash("Run"));
+            if ((grounded && !isAttacking) || !grounded)
+            {
+                normalizedHorizontalSpeed = -1;
+                transform.rotation = Quaternion.Euler(0, 180, 0);
+            }
         }
-        else
-        {
-            normalizedHorizontalSpeed = 0;
-
-            if (_controller.isGrounded)
-                _animator.Play(Animator.StringToHash("Idle"));
-        }
-
 
 
         if (Input.GetKeyDown(KeyCode.UpArrow))
         {
 
-            if(CheckGrounded())
+            if (CheckGrounded())
                 isJumping = true;
         }
 
-        if(Input.GetKey(KeyCode.UpArrow) && isJumping)
+        if (Input.GetKey(KeyCode.UpArrow) && isJumping)
         {
             if (jumpForceCalc <= 0.0f)
             {
@@ -133,16 +130,29 @@ public class ControllerMetroid : MonoBehaviour
 
         }
 
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+
+            if (!isAttacking)
+            {
+                _animator.SetTrigger("attack");
+                isAttacking = true;
+            }
+
+
+        }
+
+
 
 
         // apply horizontal speed smoothing it. dont really do this with Lerp. Use SmoothDamp or something that provides more control
         var smoothedMovementFactor = _controller.isGrounded ? groundDamping : inAirDamping; // how fast do we change direction?
-        _velocity.x = Mathf.Lerp(_velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor);
+        _velocity.x = normalizedHorizontalSpeed * runSpeed;//Mathf.Lerp(_velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor);
 
         // apply gravity before moving
-        if(!_controller.isGrounded)
+        if (!_controller.isGrounded)
             _velocity.y += gravity * Time.deltaTime;
-        
+
 
         // if holding down bump up our movement amount and turn off one way platform detection for a frame.
         // this lets us jump down through one way platforms
@@ -157,11 +167,22 @@ public class ControllerMetroid : MonoBehaviour
 
             jumpForceCalc = jumpForce;
             jumpReleased = false;
-            
+
 
         }
 
-        _controller.move(_velocity * Time.deltaTime);
+        movingPlatformVelocity = Vector3.zero;
+
+
+        Vector3 v = _velocity * Time.deltaTime;
+
+        if(_velocity.y <= 0)
+        {
+            movingPlatformVelocity = CheckMovingPlatforms(v);
+        }
+
+
+        _controller.move(v + movingPlatformVelocity);
 
         // grab our current _velocity to use as a base for all calculations
         _velocity = _controller.velocity;
@@ -184,6 +205,8 @@ public class ControllerMetroid : MonoBehaviour
 
         _animator.SetBool("jumping", isJumping);
 
+        _animator.SetFloat("speed", Mathf.Abs(normalizedHorizontalSpeed));
+
         velocityLastFrame = _controller.velocity;
 
 
@@ -192,6 +215,46 @@ public class ControllerMetroid : MonoBehaviour
     bool CheckGrounded()
     {
         return _controller.collisionState.becameGroundedThisFrame || _controller.collisionState.wasGroundedLastFrame;
+    }
+
+    RaycastHit2D _raycastHit;
+    Vector3 CheckMovingPlatforms(Vector3 deltaMovement)
+    {
+        var initialRayOrigin = _controller.raycastOrigins.bottomLeft;
+        var rayDirection = Vector3.down;
+        var rayDistance = _controller.skinWidth + Mathf.Abs(deltaMovement.y) + 0.3f;
+
+        initialRayOrigin.x += deltaMovement.x;
+
+        for (var i = 0; i < _controller.totalVerticalRays; i++)
+        {
+            var ray = new Vector2(initialRayOrigin.x + i * _controller.horizontalDistanceBetweenRays, initialRayOrigin.y);
+
+            Debug.DrawRay(ray, rayDirection * rayDistance, Color.magenta);
+            _raycastHit = Physics2D.Raycast(ray, rayDirection, rayDistance, _controller.platformMask);
+            if (_raycastHit)
+            {
+                // set our new deltaMovement and recalculate the rayDistance taking it into account
+                //deltaMovement.y = _raycastHit.point.y - ray.y;
+                //rayDistance = Mathf.Abs(deltaMovement.y);
+
+                var movingPlatform = _raycastHit.transform.GetComponent<Platform>();
+                if (movingPlatform)
+                {
+                    movingPlatform.SetOnPlatform(Time.deltaTime);
+                    return movingPlatform.Velocity;
+                }
+
+
+            }
+        }
+        return Vector3.zero;
+
+    }
+
+    public void SetAttackFiniched()
+    {
+        isAttacking = false;
     }
 
 }

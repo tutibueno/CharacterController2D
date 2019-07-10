@@ -174,10 +174,11 @@ public class CharacterController2D : MonoBehaviour
 	// horizontal/vertical movement data
 	float _verticalDistanceBetweenRays;
 	float _horizontalDistanceBetweenRays;
+    public float horizontalDistanceBetweenRays { get { return _horizontalDistanceBetweenRays; } }
 
-	// we use this flag to mark the case where we are travelling up a slope and we modified our delta.y to allow the climb to occur.
-	// the reason is so that if we reach the end of the slope we can make an adjustment to stay grounded
-	bool _isGoingUpSlope = false;
+        // we use this flag to mark the case where we are travelling up a slope and we modified our delta.y to allow the climb to occur.
+        // the reason is so that if we reach the end of the slope we can make an adjustment to stay grounded
+        bool _isGoingUpSlope = false;
 
 
 	#region Monobehaviour
@@ -261,11 +262,11 @@ public class CharacterController2D : MonoBehaviour
 			handleVerticalSlope( ref deltaMovement );
 
 		// now we check movement in the horizontal dir
-		if( deltaMovement.x != 0f )
+		if( Mathf.Abs(deltaMovement.x) > 0f )
 			moveHorizontally( ref deltaMovement );
 
 		// next, check movement in the vertical dir
-		if( deltaMovement.y != 0f )
+		if( Mathf.Abs(deltaMovement.y) > 0f )
 			moveVertically( ref deltaMovement );
 
 		// move then update our state
@@ -488,10 +489,11 @@ public class CharacterController2D : MonoBehaviour
 
 		// if we are moving up, we should ignore the layers in oneWayPlatformMask
 		var mask = platformMask;
-		if( ( isGoingUp && !collisionState.wasGroundedLastFrame ) || ignoreOneWayPlatformsThisFrame )
-			mask &= ~oneWayPlatformMask;
+        if ((isGoingUp && !collisionState.wasGroundedLastFrame) || ignoreOneWayPlatformsThisFrame)
+            mask &= ~oneWayPlatformMask;
 
-		for( var i = 0; i < totalVerticalRays; i++ )
+
+        for ( var i = 0; i < totalVerticalRays; i++ )
 		{
 			var ray = new Vector2( initialRayOrigin.x + i * _horizontalDistanceBetweenRays, initialRayOrigin.y );
 
