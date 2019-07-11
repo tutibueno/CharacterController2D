@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Prime31;
+using System;
 
+[RequireComponent(typeof(HealthController))]
 [RequireComponent(typeof(CharacterController2D))]
 public class NPC : MonoBehaviour
 {
@@ -33,16 +35,36 @@ public class NPC : MonoBehaviour
     protected float distanceFromPlayer;
     protected float currentSpeed;
 
+    HealthController healthController;
+
     // Start is called before the first frame update
     public virtual void Start()
     {
+
+        healthController = GetComponent<HealthController>();
+
+        healthController.OnDie += OnDie;
+
         animator = GetComponent<Animator>();
         controller = GetComponent<CharacterController2D>();
 
         player = GameObject.FindGameObjectWithTag("Player");
 
         currentState = Patrol;
-        
+
+    }
+
+    private void OnDisable()
+    {
+        healthController.OnDie -= OnDie;
+    }
+
+    private void OnDie()
+    {
+        Debug.Log("I am dead!");
+        animator.Play("Die");
+        this.enabled = false;
+
     }
 
     // Update is called once per frame
