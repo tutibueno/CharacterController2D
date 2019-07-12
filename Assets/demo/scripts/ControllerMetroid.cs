@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Prime31;
+using System;
 
 public class ControllerMetroid : MonoBehaviour
 {
@@ -31,9 +32,15 @@ public class ControllerMetroid : MonoBehaviour
     bool wasJumping; //indicates the jump started some point and not finished yet, can prevent jump key forever pressed (infinite jumps after landing)
     bool landed; //want add some extra feature when landing?
     Vector3 velocityLastFrame;
+    HealthController healthController;
+    bool canControl;
+    float invincibleTimer;
+    bool isOnInvincebleTimer;
+    Renderer rend;
 
     void Awake()
     {
+        rend = GetComponent<Renderer>();
         _animator = GetComponent<Animator>();
         _controller = GetComponent<CharacterController2D>();
 
@@ -41,6 +48,36 @@ public class ControllerMetroid : MonoBehaviour
         _controller.onControllerCollidedEvent += onControllerCollider;
         _controller.onTriggerEnterEvent += onTriggerEnterEvent;
         _controller.onTriggerExitEvent += onTriggerExitEvent;
+    }
+
+    private void Start()
+    {
+        canControl = true;
+    }
+
+    private void OnEnable()
+    {
+        healthController = GetComponent<HealthController>();
+        healthController.OnHit += OnHit;
+    }
+
+    private void OnHit()
+    {
+        if (healthController.isInvincible)
+            return;
+
+        healthController.SetInvincible(true);
+        canControl = false;
+        _animator.SetTrigger("onHit");
+
+    }
+
+    public void SetHitFinished()
+    {
+        canControl = true;
+        invincibleTimer = 3;
+        isOnInvincebleTimer = true;
+
     }
 
 
@@ -79,71 +116,89 @@ public class ControllerMetroid : MonoBehaviour
         if (_controller.isGrounded)
             _velocity.y = 0;
 
+        if (isOnInvincebleTimer)
+        {
+            invincibleTimer -= Time.deltaTime;
+            if (invincibleTimer <= 0)
+            {
+                healthController.SetInvincible(false);
+                isOnInvincebleTimer = false;
+                rend.material.color = Color.white;
+            }
+            else
+            {
+                rend.material.color = new Color(1, 1, 1, Time.frameCount % 2 == 0 ? 1 : 0);
+            }
+                
+        }
+            
+
         normalizedHorizontalSpeed = 0;
         bool grounded = CheckGrounded();
 
-        if (Input.GetKey(KeyCode.RightArrow))
+        if (canControl)
         {
-            if ((grounded && !isAttacking) || !grounded)
+            if (Input.GetKey(KeyCode.RightArrow))
             {
-                normalizedHorizontalSpeed = 1;
-                transform.rotation = Quaternion.Euler(0, 0, 0);
+                if ((grounded && !isAttacking) || !grounded)
+                {
+                    normalizedHorizontalSpeed = 1;
+                    transform.rotation = Quaternion.Euler(0, 0, 0);
+                }
             }
-        }
-        else if (Input.GetKey(KeyCode.LeftArrow))
-        {
-            if ((grounded && !isAttacking) || !grounded)
+            else if (Input.GetKey(KeyCode.LeftArrow))
             {
-                normalizedHorizontalSpeed = -1;
-                transform.rotation = Quaternion.Euler(0, 180, 0);
+                if ((grounded && !isAttacking) || !grounded)
+                {
+                    normalizedHorizontalSpeed = -1;
+                    transform.rotation = Quaternion.Euler(0, 180, 0);
+                }
             }
-        }
 
 
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
 
-            if (CheckGrounded())
-                isJumping = true;
-        }
+                if (CheckGrounded())
+                    isJumping = true;
+            }
 
-        if (Input.GetKey(KeyCode.UpArrow) && isJumping)
-        {
-            if (jumpForceCalc <= 0.0f)
+            if (Input.GetKey(KeyCode.UpArrow) && isJumping)
+            {
+                if (jumpForceCalc <= 0.0f)
+                {
+                    isJumping = false;
+                }
+                if (isJumping)
+                {
+                    jumpForceCalc -= Time.deltaTime;
+                    _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
+                }
+            }
+
+
+
+            //Release character to jump again
+            if (!Input.GetKey(KeyCode.UpArrow) && isJumping)
             {
                 isJumping = false;
+                jumpReleased = true;
+
             }
-            if (isJumping)
+
+            if (Input.GetKeyDown(KeyCode.E))
             {
-                jumpForceCalc -= Time.deltaTime;
-                _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
+
+                if (!isAttacking)
+                {
+                    _animator.SetTrigger("attack");
+                    isAttacking = true;
+                }
+
+
             }
         }
-
-
-
-        //Release character to jump again
-        if (!Input.GetKey(KeyCode.UpArrow) && isJumping)
-        {
-            isJumping = false;
-            jumpReleased = true;
-
-        }
-
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-
-            if (!isAttacking)
-            {
-                _animator.SetTrigger("attack");
-                isAttacking = true;
-            }
-
-
-        }
-
-
-
+                       
 
         // apply horizontal speed smoothing it. dont really do this with Lerp. Use SmoothDamp or something that provides more control
         var smoothedMovementFactor = _controller.isGrounded ? groundDamping : inAirDamping; // how fast do we change direction?
@@ -252,10 +307,11 @@ public class ControllerMetroid : MonoBehaviour
 
     }
 
-    public void SetAttackFiniched()
+    public void SetAttackFinished()
     {
         isAttacking = false;
     }
+
 
 }
 

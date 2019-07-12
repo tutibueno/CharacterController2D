@@ -24,7 +24,7 @@ public class Weapon : MonoBehaviour
         Debug.Log("collided Trigger");
         var health = collision.transform.GetComponent<HealthController>();
         if (health)
-            health.OnHit(damage);
+            health.Hit(damage);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -32,7 +32,7 @@ public class Weapon : MonoBehaviour
         Debug.Log("collided Collision");
         var health = collision.transform.GetComponent<HealthController>();
         if (health)
-            health.OnHit(damage);
+            health.Hit(damage);
     }
 
 }

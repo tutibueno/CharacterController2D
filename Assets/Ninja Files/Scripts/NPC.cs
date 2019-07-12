@@ -22,6 +22,9 @@ public class NPC : MonoBehaviour
     [SerializeField]
     protected float distanceToAttack = 1;
 
+    [SerializeField]
+    protected float touchDamage = 10;
+
     protected GameObject player;
 
     protected Animator animator;
@@ -34,6 +37,8 @@ public class NPC : MonoBehaviour
 
     protected float distanceFromPlayer;
     protected float currentSpeed;
+    protected BoxCollider2D boxCollider;
+
 
     HealthController healthController;
 
@@ -52,6 +57,8 @@ public class NPC : MonoBehaviour
 
         currentState = Patrol;
 
+        boxCollider = GetComponent<BoxCollider2D>();
+
     }
 
     private void OnDisable()
@@ -64,6 +71,7 @@ public class NPC : MonoBehaviour
         Debug.Log("I am dead!");
         animator.Play("Die");
         this.enabled = false;
+        boxCollider.enabled = false;
 
     }
 
@@ -162,4 +170,33 @@ public class NPC : MonoBehaviour
 
 
     }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (healthController.IsDead())
+            return;
+
+        Debug.Log("Collided with: " + collision.transform.tag);
+        if(collision.transform.tag.Equals("Player"))
+        {
+            var hc = collision.transform.GetComponent<HealthController>();
+            hc.Hit(touchDamage);
+        }
+        
+    }
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        if (healthController.IsDead())
+            return;
+
+        Debug.Log("Collided with: " + collision.transform.tag);
+        if (collision.transform.tag.Equals("Player"))
+        {
+            var hc = collision.transform.GetComponent<HealthController>();
+            hc.Hit(touchDamage);
+        }
+
+    }
+
 }
