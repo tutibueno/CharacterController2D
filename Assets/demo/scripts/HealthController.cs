@@ -6,33 +6,39 @@ public class HealthController : MonoBehaviour
 {
 
     [SerializeField]
-    float health = 100;
+    float health = 10;
 
     [SerializeField]
-    public bool isInvincible { get; private set; }
+    public bool IsInvincible { get; private set; }
+
+    public bool IsDead { get { return health <= 0; } }
 
     public System.Action OnDie { get; set; }
-    public System.Action OnHit { get; set; }
+    public System.Action<Vector2> OnHit { get; set; }
+
+    public float HealthAmount { get { return health; } }
 
     // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
         
     }
 
-    public void Hit(float amount)
+    public void Hit(float amount, Vector2 hitSource)
     {
-        if (isInvincible)
+        if (IsInvincible)
+            return;
+
+        if (IsDead)
             return;
 
         health -= amount;
         if (health <= 0)
         {
             Die();
-            return;
         }
 
-        OnHit?.Invoke();
+        OnHit?.Invoke(hitSource);
             
 
     }
@@ -44,11 +50,7 @@ public class HealthController : MonoBehaviour
 
     public void SetInvincible(bool enable)
     {
-        isInvincible = enable;
+        IsInvincible = enable;
     }
 
-    public bool IsDead()
-    {
-        return health <= 0;
-    }
 }

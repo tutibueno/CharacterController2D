@@ -12,6 +12,7 @@ public class NPCHazardMan : NPC
     // Start is called before the first frame update
     public override void Start()
     {
+        
         base.Start();
         
     }
@@ -20,6 +21,9 @@ public class NPCHazardMan : NPC
     public override void Update()
     {
         base.Update();
+
+        if (healthController.IsDead)
+            return;
     }
 
     public override void Attack()
@@ -70,7 +74,7 @@ public class NPCHazardMan : NPC
         if (WillFall())
             direction *= -1;
 
-        if (distanceFromPlayer <= distanceToAttack)
+        if (distanceFromPlayer <= distanceToAttack && canAttack)
             currentState = Attack;
 
         //Adjust rotation
@@ -94,7 +98,7 @@ public class NPCHazardMan : NPC
             currentState = Patrol;
         }
 
-        if (distanceFromPlayer <= distanceToAttack)
+        if (distanceFromPlayer <= distanceToAttack && canAttack)
             currentState = Attack;
 
 

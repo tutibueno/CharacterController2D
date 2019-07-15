@@ -25,6 +25,12 @@ public class NPC : MonoBehaviour
     [SerializeField]
     protected float touchDamage = 10;
 
+    [SerializeField]
+    protected bool canAttack;
+
+    [SerializeField]
+    protected bool invertedSprite;
+
     protected GameObject player;
 
     protected Animator animator;
@@ -40,7 +46,7 @@ public class NPC : MonoBehaviour
     protected BoxCollider2D boxCollider;
 
 
-    HealthController healthController;
+    protected HealthController healthController;
 
     // Start is called before the first frame update
     public virtual void Start()
@@ -69,9 +75,8 @@ public class NPC : MonoBehaviour
     private void OnDie()
     {
         Debug.Log("I am dead!");
-        animator.Play("Die");
-        this.enabled = false;
-        boxCollider.enabled = false;
+        animator.SetTrigger("onDie");
+        Invoke("StopAll", 3);
 
     }
 
@@ -83,7 +88,8 @@ public class NPC : MonoBehaviour
         if (!controller.isGrounded)
             velocity.y = gravity;
 
-
+        if (healthController.IsDead) 
+            return;
 
         currentState();
 
@@ -162,41 +168,52 @@ public class NPC : MonoBehaviour
         if (WillFall())
             direction *= -1;
 
-        if (distanceFromPlayer <= distanceToAttack)
+        if (distanceFromPlayer <= distanceToAttack && canAttack)
             currentState = Attack;
 
         //Adjust rotation
-        transform.rotation = Quaternion.Euler(0, direction > 0 ? 0 : 180, 0);
+        if(!invertedSprite)
+            transform.rotation = Quaternion.Euler(0, direction > 0 ? 0 : 180, 0);
+        else
+            transform.rotation = Quaternion.Euler(0, direction > 0 ? 180 : 0, 0);
 
 
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (healthController.IsDead())
+        if (healthController.IsDead)
             return;
 
         Debug.Log("Collided with: " + collision.transform.tag);
         if(collision.transform.tag.Equals("Player"))
         {
             var hc = collision.transform.GetComponent<HealthController>();
-            hc.Hit(touchDamage);
+            hc.Hit(touchDamage, transform.position);
         }
         
     }
 
     private void OnCollisionStay2D(Collision2D collision)
     {
-        if (healthController.IsDead())
+        if (healthController.IsDead)
             return;
 
         Debug.Log("Collided with: " + collision.transform.tag);
         if (collision.transform.tag.Equals("Player"))
         {
             var hc = collision.transform.GetComponent<HealthController>();
-            hc.Hit(touchDamage);
+            hc.Hit(touchDamage, transform.position);
         }
 
+    }
+
+    void StopAll()
+    {
+        animator.enabled = false;
+        healthController.enabled = false;
+        this.enabled = false;
+        boxCollider.enabled = false;
     }
 
 }

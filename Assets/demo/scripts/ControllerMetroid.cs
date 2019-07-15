@@ -18,11 +18,13 @@ public class ControllerMetroid : MonoBehaviour
 
     private float normalizedHorizontalSpeed = 0;
 
-    private CharacterController2D _controller;
-    private Animator _animator;
-    private RaycastHit2D _lastControllerColliderHit;
-    private Vector3 _velocity;
+    private CharacterController2D controller;
+    private Animator animator;
+    private RaycastHit2D lastControllerColliderHit;
+    private Vector3 velocity;
     Vector3 movingPlatformVelocity;
+    private bool isInDash;
+    private float dashTime;
 
     bool isAttacking;
     bool isFalling;
@@ -36,19 +38,47 @@ public class ControllerMetroid : MonoBehaviour
     bool canControl;
     float invincibleTimer;
     bool isOnInvincebleTimer;
-    Renderer rend;
+    bool isTakingHit;
+    bool waitingToGrouded;
+    float takingHitTimer;
+    Vector2 hitSource;
+    int hitDirection;
+    SpriteRenderer spriteRenderer;
+    List<SpriteRenderer> spritesCopy = new List<SpriteRenderer>();
 
     void Awake()
     {
-        rend = GetComponent<Renderer>();
-        _animator = GetComponent<Animator>();
-        _controller = GetComponent<CharacterController2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        animator = GetComponent<Animator>();
+        controller = GetComponent<CharacterController2D>();
 
         // listen to some events for illustration purposes
-        _controller.onControllerCollidedEvent += onControllerCollider;
-        _controller.onTriggerEnterEvent += onTriggerEnterEvent;
-        _controller.onTriggerExitEvent += onTriggerExitEvent;
+        controller.onControllerCollidedEvent += onControllerCollider;
+        controller.onTriggerEnterEvent += onTriggerEnterEvent;
+        controller.onTriggerExitEvent += onTriggerExitEvent;
+
+        PrepareSprites();
+
+
     }
+
+    void PrepareSprites()
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            var go = new GameObject("spriteCopy");
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = spriteRenderer.sprite;
+            spritesCopy.Add(sr);
+            sr.transform.position = transform.position;
+            sr.transform.localScale = transform.localScale;
+        }
+
+        StartCoroutine(ControlSpritesCopy());
+
+    }
+
+
 
     private void Start()
     {
@@ -61,14 +91,20 @@ public class ControllerMetroid : MonoBehaviour
         healthController.OnHit += OnHit;
     }
 
-    private void OnHit()
+    private void OnHit(Vector2 _hitSource)
     {
-        if (healthController.isInvincible)
+        if (healthController.IsInvincible)
             return;
 
         healthController.SetInvincible(true);
         canControl = false;
-        _animator.SetTrigger("onHit");
+        animator.SetTrigger("onHit");
+
+        takingHitTimer = 0.5f;
+        waitingToGrouded = true;
+        hitSource = _hitSource;
+        hitDirection = hitSource.x >= transform.position.x ? -1 : 1;
+
 
     }
 
@@ -113,8 +149,50 @@ public class ControllerMetroid : MonoBehaviour
     {
 
 
-        if (_controller.isGrounded)
-            _velocity.y = 0;
+        if ((controller.isGrounded && !waitingToGrouded) || isInDash)
+            velocity.y = 0;
+
+        // apply gravity before moving
+        if (!controller.isGrounded && !isInDash)
+            velocity.y += gravity * Time.deltaTime;
+
+        normalizedHorizontalSpeed = 0;
+
+
+        if (healthController.IsDead)
+            canControl = false;
+
+        if (Input.GetKeyDown(KeyCode.H))
+        {
+            velocity.y =  -gravity  * 0.3f;
+            waitingToGrouded = true;
+            takingHitTimer = 0.5f;
+        }
+
+        //Control hit
+        if(waitingToGrouded || takingHitTimer > 0)
+        {
+            if(takingHitTimer >= 0.5f)
+                velocity.y = -gravity * 0.3f;
+
+            takingHitTimer -= Time.deltaTime;
+            //velocity.x = hitDirection * runSpeed;
+            normalizedHorizontalSpeed = hitDirection;
+            if (CheckGrounded() && takingHitTimer <= 0) {
+                waitingToGrouded = false;
+                if (!healthController.IsDead)
+                {
+                    canControl = true;
+                    isOnInvincebleTimer = true;
+                    invincibleTimer = 3;
+                }
+                else
+                    animator.Play("Die");
+
+            }
+
+        }
+
 
         if (isOnInvincebleTimer)
         {
@@ -123,20 +201,19 @@ public class ControllerMetroid : MonoBehaviour
             {
                 healthController.SetInvincible(false);
                 isOnInvincebleTimer = false;
-                rend.material.color = Color.white;
+                spriteRenderer.color = Color.white;
             }
             else
             {
-                rend.material.color = new Color(1, 1, 1, Time.frameCount % 2 == 0 ? 1 : 0);
+                spriteRenderer.color = new Color(1, 1, 1, Time.frameCount % 2 == 0 ? 1 : 0);
             }
-                
-        }
-            
 
-        normalizedHorizontalSpeed = 0;
+        }
+
+
         bool grounded = CheckGrounded();
 
-        if (canControl)
+        if (canControl && !isInDash)
         {
             if (Input.GetKey(KeyCode.RightArrow))
             {
@@ -172,7 +249,7 @@ public class ControllerMetroid : MonoBehaviour
                 if (isJumping)
                 {
                     jumpForceCalc -= Time.deltaTime;
-                    _velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
+                    velocity.y = Mathf.Sqrt(3 * jumpHeight * -gravity);
                 }
             }
 
@@ -191,32 +268,55 @@ public class ControllerMetroid : MonoBehaviour
 
                 if (!isAttacking)
                 {
-                    _animator.SetTrigger("attack");
+                    animator.SetTrigger("attack");
                     isAttacking = true;
                 }
 
 
             }
+
+            if (Input.GetKeyDown(KeyCode.Q) && !isAttacking && !CheckGrounded())
+            {
+                isInDash = true;
+                dashTime = 0;
+                animator.SetTrigger("startDash");
+            }
+
         }
-                       
+
+        float dashSpeed = runSpeed * 0.5f;
+
+        //Control Dash
+        if (isInDash)
+        {
+            dashTime += Time.deltaTime;
+            if (dashTime >= 0.5f)
+                isInDash = false;
+            else
+            {
+                normalizedHorizontalSpeed = transform.rotation.eulerAngles.y > 0 ? -1 : 1;
+            }
+        }
+        else
+            dashSpeed = 1;
+
+
 
         // apply horizontal speed smoothing it. dont really do this with Lerp. Use SmoothDamp or something that provides more control
-        var smoothedMovementFactor = _controller.isGrounded ? groundDamping : inAirDamping; // how fast do we change direction?
-        _velocity.x = normalizedHorizontalSpeed * runSpeed;//Mathf.Lerp(_velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor);
+        var smoothedMovementFactor = controller.isGrounded ? groundDamping : inAirDamping; // how fast do we change direction?
+        velocity.x = normalizedHorizontalSpeed * runSpeed * dashSpeed;//Mathf.Lerp(_velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor);
 
-        // apply gravity before moving
-        if (!_controller.isGrounded)
-            _velocity.y += gravity * Time.deltaTime;
+
 
 
         // if holding down bump up our movement amount and turn off one way platform detection for a frame.
         // this lets us jump down through one way platforms
-        if (_controller.isGrounded)
+        if (controller.isGrounded)
         {
             if (Input.GetKey(KeyCode.DownArrow))
             {
-                _velocity.y *= 3f;
-                _controller.ignoreOneWayPlatformsThisFrame = true;
+                velocity.y *= 3f;
+                controller.ignoreOneWayPlatformsThisFrame = true;
             }
 
 
@@ -229,20 +329,20 @@ public class ControllerMetroid : MonoBehaviour
         movingPlatformVelocity = Vector3.zero;
 
 
-        Vector3 v = _velocity * Time.deltaTime;
+        Vector3 v = velocity * Time.deltaTime;
 
-        if(_velocity.y <= 0)
+        if(velocity.y <= 0)
         {
             movingPlatformVelocity = CheckMovingPlatforms(v);
         }
 
 
-        _controller.move(v + movingPlatformVelocity);
+        controller.move(v + movingPlatformVelocity);
 
         // grab our current _velocity to use as a base for all calculations
-        _velocity = _controller.velocity;
+        velocity = controller.velocity;
 
-        isFalling = _velocity.y < 0 && !CheckGrounded();
+        isFalling = velocity.y < 0 && !CheckGrounded();
 
         if (!isFalling && velocityLastFrame.y < -1 && !landed)
         {
@@ -252,41 +352,45 @@ public class ControllerMetroid : MonoBehaviour
         else
             landed = false;
 
-        _animator.SetFloat("velocityY", _velocity.y);
+        animator.SetFloat("velocityY", velocity.y);
 
-        _animator.SetBool("grounded", CheckGrounded());
+        animator.SetBool("grounded", CheckGrounded());
 
-        _animator.SetBool("falling", isFalling);
+        animator.SetBool("falling", isFalling);
 
-        _animator.SetBool("jumping", isJumping);
+        animator.SetBool("jumping", isJumping);
 
-        _animator.SetFloat("speed", Mathf.Abs(normalizedHorizontalSpeed));
+        animator.SetFloat("speed", Mathf.Abs(normalizedHorizontalSpeed));
 
-        velocityLastFrame = _controller.velocity;
+        animator.SetBool("canControl", canControl);
+
+        animator.SetBool("isDash", isInDash);
+
+        velocityLastFrame = controller.velocity;
 
 
     }
 
     bool CheckGrounded()
     {
-        return _controller.collisionState.becameGroundedThisFrame || _controller.collisionState.wasGroundedLastFrame;
+        return controller.collisionState.becameGroundedThisFrame || controller.collisionState.wasGroundedLastFrame;
     }
 
     RaycastHit2D _raycastHit;
     Vector3 CheckMovingPlatforms(Vector3 deltaMovement)
     {
-        var initialRayOrigin = _controller.raycastOrigins.bottomLeft;
+        var initialRayOrigin = controller.raycastOrigins.bottomLeft;
         var rayDirection = Vector3.down;
-        var rayDistance = _controller.skinWidth + Mathf.Abs(deltaMovement.y) + 0.3f;
+        var rayDistance = controller.skinWidth + Mathf.Abs(deltaMovement.y) + 0.3f;
 
         initialRayOrigin.x += deltaMovement.x;
 
-        for (var i = 0; i < _controller.totalVerticalRays; i++)
+        for (var i = 0; i < controller.totalVerticalRays; i++)
         {
-            var ray = new Vector2(initialRayOrigin.x + i * _controller.horizontalDistanceBetweenRays, initialRayOrigin.y);
+            var ray = new Vector2(initialRayOrigin.x + i * controller.horizontalDistanceBetweenRays, initialRayOrigin.y);
 
             Debug.DrawRay(ray, rayDirection * rayDistance, Color.magenta);
-            _raycastHit = Physics2D.Raycast(ray, rayDirection, rayDistance, _controller.platformMask);
+            _raycastHit = Physics2D.Raycast(ray, rayDirection, rayDistance, controller.platformMask);
             if (_raycastHit)
             {
                 // set our new deltaMovement and recalculate the rayDistance taking it into account
@@ -310,6 +414,24 @@ public class ControllerMetroid : MonoBehaviour
     public void SetAttackFinished()
     {
         isAttacking = false;
+    }
+
+    IEnumerator ControlSpritesCopy()
+    {
+        while (true)
+        {
+            foreach (var item in spritesCopy)
+            {
+                item.transform.position = transform.position;
+                item.transform.rotation = transform.rotation;
+                item.sprite = spriteRenderer.sprite;
+                item.color = new Color(1, 1, 1, 0.4f);
+                for (int i = 0; i < 5; i++)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+            }
+        }
     }
 
 
