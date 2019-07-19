@@ -23,6 +23,8 @@ public class DropItem : MonoBehaviour
     RaycastHit2D raycastHit;
     Renderer _renderer;
 
+    float timeAcum;
+
     // Start is called before the first frame update
     void Awake()
     {
@@ -41,9 +43,10 @@ public class DropItem : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
         primeRaycastOrigins();
 
-        Move(new Vector3(velocity.x * Mathf.Sin(Time.time * 3) , velocity.y, 0) * Time.deltaTime);
+        Move(new Vector3(velocity.x * Mathf.Sin(timeAcum * 3) , velocity.y, 0) * Time.deltaTime);
 
         if(isGrounded)
         {
@@ -65,6 +68,7 @@ public class DropItem : MonoBehaviour
         }
 
         isGrounded = false;
+        timeAcum += Time.deltaTime;
     }
 
 

@@ -130,7 +130,7 @@ public class Platform : MonoBehaviour
     }
 
     //called by character
-    public void SetOnPlatform(float deltaTime)
+    public void SetOnPlatform()
     {
         isOnPlatform = true;
     }

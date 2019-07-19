@@ -39,6 +39,7 @@ public class ControllerMetroid : MonoBehaviour
     float invincibleTimer;
     bool isOnInvincebleTimer;
     bool isTakingHit;
+    bool isOnMovingPlatform;
     bool waitingToGrouded;
     float takingHitTimer;
     Vector2 hitSource;
@@ -64,14 +65,17 @@ public class ControllerMetroid : MonoBehaviour
 
     void PrepareSprites()
     {
+        spriteRenderer.sortingOrder = 100;
+
         for (int i = 0; i < 6; i++)
         {
-            var go = new GameObject("spriteCopy");
+            var go = new GameObject("spriteCopy_"+i);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = spriteRenderer.sprite;
             spritesCopy.Add(sr);
             sr.transform.position = transform.position;
             sr.transform.localScale = transform.localScale;
+            sr.sortingOrder = 100 - 1 - i;
         }
 
         StartCoroutine(ControlSpritesCopy());
@@ -149,7 +153,7 @@ public class ControllerMetroid : MonoBehaviour
     {
 
 
-        if ((controller.isGrounded && !waitingToGrouded) || isInDash)
+        if ((CheckGrounded() && !waitingToGrouded) || isInDash)
             velocity.y = 0;
 
         // apply gravity before moving
@@ -220,7 +224,8 @@ public class ControllerMetroid : MonoBehaviour
                 if ((grounded && !isAttacking) || !grounded)
                 {
                     normalizedHorizontalSpeed = 1;
-                    transform.rotation = Quaternion.Euler(0, 0, 0);
+                    if(!isAttacking)
+                        transform.rotation = Quaternion.Euler(0, 0, 0);
                 }
             }
             else if (Input.GetKey(KeyCode.LeftArrow))
@@ -228,7 +233,8 @@ public class ControllerMetroid : MonoBehaviour
                 if ((grounded && !isAttacking) || !grounded)
                 {
                     normalizedHorizontalSpeed = -1;
-                    transform.rotation = Quaternion.Euler(0, 180, 0);
+                    if(!isAttacking)
+                        transform.rotation = Quaternion.Euler(0, 180, 0);
                 }
             }
 
@@ -328,19 +334,17 @@ public class ControllerMetroid : MonoBehaviour
 
         movingPlatformVelocity = Vector3.zero;
 
-
         Vector3 v = velocity * Time.deltaTime;
 
-        if(velocity.y <= 0)
-        {
-            movingPlatformVelocity = CheckMovingPlatforms(v);
-        }
-
-
+        movingPlatformVelocity = CheckMovingPlatforms(v);
+        
         controller.move(v + movingPlatformVelocity);
 
         // grab our current _velocity to use as a base for all calculations
         velocity = controller.velocity;
+
+        if (movingPlatformVelocity.y > 0)
+            transform.Translate(new Vector3(0, movingPlatformVelocity.y, 0));
 
         isFalling = velocity.y < 0 && !CheckGrounded();
 
@@ -400,7 +404,8 @@ public class ControllerMetroid : MonoBehaviour
                 var movingPlatform = _raycastHit.transform.GetComponent<Platform>();
                 if (movingPlatform)
                 {
-                    movingPlatform.SetOnPlatform(Time.deltaTime);
+                    if(deltaMovement.y <= 0)
+                        movingPlatform.SetOnPlatform();
                     return movingPlatform.Velocity;
                 }
 
@@ -418,18 +423,26 @@ public class ControllerMetroid : MonoBehaviour
 
     IEnumerator ControlSpritesCopy()
     {
-        while (true)
+        while (Time.deltaTime > 0)
         {
-            foreach (var item in spritesCopy)
+
+            for (int i = 0; i < spritesCopy.Count; i++)
             {
-                item.transform.position = transform.position;
-                item.transform.rotation = transform.rotation;
-                item.sprite = spriteRenderer.sprite;
-                item.color = new Color(1, 1, 1, 0.4f);
-                for (int i = 0; i < 5; i++)
+                var s = spritesCopy[i];
+
+                s.transform.position = transform.position;
+                s.transform.rotation = transform.rotation;
+                s.sprite = spriteRenderer.sprite;
+                float fi = i;
+                float scc = spritesCopy.Count;
+                float c = 1 - (fi / scc);
+                s.color = new Color(c, c, 1, 0.4f);
+
+                for (int j = 0; j < 3; j++)
                 {
                     yield return new WaitForEndOfFrame();
                 }
+
             }
         }
     }
